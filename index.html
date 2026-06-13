@@ -36,15 +36,20 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 .hidden{display:none!important}
 .result-content-box{padding:12px;border-radius:8px;margin-top:5px;line-height:1.6;font-size:15px;word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;}
 
-/* 대시보드 (출석/할당량) 모바일 호환 수정 */
+/* 대시보드 (출석/할당량) */
 .dashboard {background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
 .dash-title {font-size: 18px; font-weight: bold; margin-bottom: 10px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;}
 .dash-dday {background: var(--secondary); color: #000; padding: 4px 10px; border-radius: 20px; font-size: 14px; white-space: nowrap;}
-.dash-stats {display: flex; gap: 15px; margin-top: 15px;}
+.dash-stats {display: flex; gap: 15px; margin-top: 10px;}
 .dash-stat-box {background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; flex: 1; text-align: center;}
 .dash-stat-num {font-size: 24px; font-weight: bold; margin-top: 5px;}
 
-/* 직접 입력 폼 모바일 호환 수정 */
+/* 진도율 에너지바 (Progress Bar) */
+.progress-wrapper {margin-top: 15px; background: rgba(0,0,0,0.3); border-radius: 15px; padding: 4px; position: relative; height: 22px;}
+.progress-bar {height: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b); border-radius: 12px; width: 0%; transition: width 0.8s ease-in-out;}
+.progress-text {position: absolute; width: 100%; text-align: center; top: 50%; left: 0; transform: translateY(-50%); font-size: 13px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.6); pointer-events: none;}
+
+/* 직접 입력 폼 모바일 호환 */
 .range-inputs {display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 15px;}
 .range-part {display: flex; align-items: center; gap: 5px; white-space: nowrap;}
 .num-input {width: 55px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; text-align: center;}
@@ -65,31 +70,34 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 <body>
 <div class="container">
     
-    <!-- 1. 메인 화면 -->
     <div id="screen-home">
         
-        <!-- 대시보드 (진도율 및 일일 할당량) -->
         <div class="dashboard">
             <div class="dash-title">
                 <span>🗓️ 6월 26일 목표 진도표 (7~12장)</span>
                 <span class="dash-dday" id="dash-dday-badge">D-?</span>
             </div>
-            <div style="font-size: 13px; opacity: 0.9;">시험 통과를 위해 매일 꾸준히 암송해야 할 분량입니다.</div>
+            <div style="font-size: 13px; opacity: 0.9;">100점을 맞은 말씀은 자동으로 암송 완료 처리되어 진도율이 오릅니다.</div>
+            
             <div class="dash-stats">
                 <div class="dash-stat-box">
                     <div style="font-size:12px;">오늘 외워야 할 할당량</div>
                     <div class="dash-stat-num" id="dash-quota">0절</div>
                 </div>
                 <div class="dash-stat-box">
-                    <div style="font-size:12px;">7~12장 마스터 현황</div>
+                    <div style="font-size:12px;">마스터(100점) 현황</div>
                     <div class="dash-stat-num" id="dash-mastered">0 / 0절</div>
                 </div>
             </div>
-            <!-- 출석체크용 시험 버튼 -->
+
+            <div class="progress-wrapper">
+                <div class="progress-bar" id="dash-progress-bar"></div>
+                <div class="progress-text" id="dash-progress-text">전체 진도율 0%</div>
+            </div>
+
             <button class="btn btn-daily" onclick="startDailyExam()">🔥 오늘의 할당량 출석 시험보기 (목표절)</button>
         </div>
 
-        <!-- 직접 범위 입력 폼 모바일 구조 개선 -->
         <div class="input-group">
             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:5px;">
                 <span style="font-weight:700; color:var(--primary); font-size:16px;">출제 범위 직접 입력</span>
@@ -127,7 +135,6 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         </div>
     </div>
 
-    <!-- 2. 시험 화면 -->
     <div id="screen-exam" class="hidden">
         <h2 id="exam-title">시험 응시</h2>
         <div id="exam-info" style="text-align:right;font-size:13px;color:#666;margin-bottom:10px;font-weight:700"></div>
@@ -136,7 +143,6 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:10px;">시험 취소 (뒤로가기)</button>
     </div>
 
-    <!-- 3. 결과 화면 -->
     <div id="screen-result" class="hidden">
         <h2>채점 결과</h2>
         <div class="score-board">
@@ -144,7 +150,6 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
             <div class="score-num" id="res-score">0점</div>
         </div>
         
-        <!-- AI 피드백 분석 박스 -->
         <div id="result-feedback" class="feedback-box"></div>
 
         <div id="result-details"></div>
@@ -154,14 +159,12 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         </div>
     </div>
 
-    <!-- 4. 기록(히스토리) 화면 -->
     <div id="screen-history" class="hidden">
         <h2>내 응시 기록</h2>
         <div id="history-list"></div>
         <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:20px;">홈으로 돌아가기</button>
     </div>
 
-    <!-- 5. 오답 노트 (기록 상세) 화면 -->
     <div id="screen-history-detail" class="hidden">
         <h2>상세 채점 내역</h2>
         <div id="history-detail-content"></div>
@@ -279,7 +282,7 @@ function updateDashboard() {
     let masteredCount = masteredSet.size;
     let remainingVerses = totalTarget - masteredCount;
     
-    // 일일 할당량 계산
+    // 일일 할당량 계산 (이월 효과 적용됨)
     let dailyQuota = dDay > 0 ? Math.ceil(remainingVerses / dDay) : remainingVerses;
     todayQuotaCount = dailyQuota;
 
@@ -287,6 +290,11 @@ function updateDashboard() {
     $('dash-quota').innerText = `${dailyQuota}절`;
     $('dash-mastered').innerText = `${masteredCount} / ${totalTarget}절`;
     
+    // 에너지바(진도율) 계산 및 적용
+    let progressPercent = totalTarget === 0 ? 0 : Math.round((masteredCount / totalTarget) * 100);
+    $('dash-progress-bar').style.width = `${progressPercent}%`;
+    $('dash-progress-text').innerText = `전체 진도율 ${progressPercent}%`;
+
     if(masteredCount >= totalTarget && totalTarget > 0) {
         $('dash-quota').innerText = `🎉 달성 완료`;
         $('dash-quota').style.color = "#fbbf24";
@@ -480,7 +488,7 @@ window.submitExam = () => {
     } else {
         feedbackHtml += `<ul class="feedback-list">
             <li>놀랍습니다! 출제된 <b>모든 말씀을 완벽하게 마스터</b>했습니다. 💯</li>
-            <li>이 성구들은 대시보드의 [마스터 현황]에 추가되어, 앞으로 출석 시험에는 당분간 출제되지 않습니다.</li>
+            <li>이 성구들은 대시보드의 [마스터 현황]에 추가되어 진도율이 상승했습니다!</li>
             <li>지금처럼 계속 진도를 빼시면 D-Day 이전에 여유롭게 완료하실 수 있습니다!</li>
         </ul>`;
     }
