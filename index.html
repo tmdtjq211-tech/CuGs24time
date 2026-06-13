@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>말씀 실력 점검 시스템</title>
+<title>암송 실력 점검 시스템 (D-Day 관리형)</title>
 
+<!-- 외부 데이터(data.js)와 Diff 라이브러리 로드 -->
 <script src="data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
 <style>
@@ -20,9 +21,8 @@ h3{margin-top:0}
 .btn.btn-secondary:hover{background:#4b5563;}
 .btn.btn-danger{background:var(--error)}
 .btn-sm{width:auto;padding:6px 12px;font-size:12px;margin-top:0}
-.input-group{margin-bottom:15px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;}
+.input-group{margin-bottom:15px; padding:15px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;}
 .input-group label{display:block; margin-bottom:8px; font-weight:700; color:var(--primary)}
-select {padding:8px; border:1px solid #d1d5db; border-radius:6px; margin-right:5px; font-size:14px;}
 .question-box{background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:10px;margin-bottom:20px}
 .q-title{font-weight:700;color:var(--primary);margin-bottom:15px;border-bottom:2px solid var(--secondary);padding-bottom:5px}
 textarea{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;min-height:80px;resize:vertical;box-sizing:border-box;font-size:15px;line-height:1.6;margin-bottom:5px}
@@ -34,12 +34,31 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 .acc-low{background:var(--error)}
 .hidden{display:none!important}
 .result-content-box{padding:12px;border-radius:8px;margin-top:5px;line-height:1.6;font-size:15px;word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;}
-.verse-label {font-size: 14px; font-weight: 700; color: var(--primary); display: inline-block; margin-top: 5px; margin-bottom: 2px;}
 
 /* 탭 스타일 */
 .tab-container {display: flex; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;}
 .tab {flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: bold; color: #64748b;}
 .tab.active {color: var(--primary); border-bottom: 3px solid var(--primary); margin-bottom: -2px;}
+
+/* 대시보드 (출석/할당량) */
+.dashboard {background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 20px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+.dash-title {font-size: 18px; font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+.dash-dday {background: var(--secondary); color: #000; padding: 4px 10px; border-radius: 20px; font-size: 14px;}
+.dash-stats {display: flex; gap: 15px; margin-top: 15px;}
+.dash-stat-box {background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px; flex: 1; text-align: center;}
+.dash-stat-num {font-size: 24px; font-weight: bold; margin-top: 5px;}
+
+/* 챕터 체크박스 그리드 */
+.ch-grid {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;}
+.ch-label {background: #fff; border: 1px solid #ccc; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 14px; user-select: none; transition: 0.2s; font-weight: bold;}
+.ch-label:has(input:checked) {background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+.ch-label input {display: none;}
+
+/* 피드백 박스 */
+.feedback-box {background: #f0fdf4; border: 2px solid #bbf7d0; padding: 20px; border-radius: 10px; margin-bottom: 20px;}
+.feedback-title {font-weight: bold; color: #166534; font-size: 16px; margin-bottom: 10px;}
+.feedback-list {color: #15803d; font-size: 14px; padding-left: 20px;}
+.feedback-list li {margin-bottom: 5px;}
 
 /* 히스토리 리스트 */
 .history-item {background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
@@ -50,55 +69,56 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 <body>
 <div class="container">
     
+    <!-- 1. 메인 화면 -->
     <div id="screen-home">
-        <h2 style="background:var(--secondary);padding:10px;border-radius:8px">말씀 실력 점검</h2>
         
+        <!-- 대시보드 (진도율 및 일일 할당량) -->
+        <div class="dashboard">
+            <div class="dash-title">
+                <span>🗓️ 6월 26일 목표 진도표 (7~12장)</span>
+                <span class="dash-dday" id="dash-dday-badge">D-?</span>
+            </div>
+            <div style="font-size: 13px; opacity: 0.9;">본 시험을 통과하기 위해 매일 꾸준히 암송해야 할 분량입니다. (미접속 시 할당량이 누적됩니다)</div>
+            <div class="dash-stats">
+                <div class="dash-stat-box">
+                    <div style="font-size:12px;">오늘 외워야 할 할당량</div>
+                    <div class="dash-stat-num" id="dash-quota">0절</div>
+                </div>
+                <div class="dash-stat-box">
+                    <div style="font-size:12px;">7~12장 마스터 현황</div>
+                    <div class="dash-stat-num" id="dash-mastered">0 / 0절</div>
+                </div>
+            </div>
+        </div>
+
         <div class="tab-container">
-            <div class="tab active" id="tab-normal" onclick="switchMode('normal')">응시하기 (범위 지정)</div>
+            <div class="tab active" id="tab-normal" onclick="switchMode('normal')">응시하기 (전체 출제)</div>
             <div class="tab" id="tab-mock" onclick="switchMode('mock')">모의고사 (30문제 랜덤)</div>
         </div>
 
-        <div id="setup-normal" class="input-group">
-            <label>출제 범위 선택 (장/절)</label>
-            <div style="margin-bottom: 10px; display:flex; align-items:center;">
-                <span style="width: 40px; font-weight:bold;">시작:</span>
-                <select id="start-ch" onchange="updateVerseSelect('start-ch', 'start-v')"></select> 장
-                <select id="start-v" style="margin-left: 10px;"></select> 절
+        <!-- 출제 범위 선택 (공통) -->
+        <div class="input-group">
+            <label>출제 장(Chapter) 선택</label>
+            <p style="font-size:12px; color:#666; margin-top:0;">기본적으로 목표인 7장~12장이 고정되어 있습니다. 터치하여 추가하거나 해제할 수 있습니다.</p>
+            <div class="ch-grid" id="chapter-grid">
+                <!-- 체크박스 동적 생성 -->
             </div>
-            <div style="display:flex; align-items:center;">
-                <span style="width: 40px; font-weight:bold;">종료:</span>
-                <select id="end-ch" onchange="updateVerseSelect('end-ch', 'end-v')"></select> 장
-                <select id="end-v" style="margin-left: 10px;"></select> 절
-            </div>
-            <p style="font-size:12px; color:#666; margin-top:10px;">선택한 범위 안에서 랜덤으로 모든 절이 출제됩니다.</p>
-        </div>
-
-        <div id="setup-mock" class="input-group hidden">
-            <label>모의고사 출제 범위 (장 단위)</label>
-            <div style="margin-bottom: 10px; display:flex; align-items:center;">
-                <span style="width: 40px; font-weight:bold;">시작:</span>
-                <select id="mock-start-ch"></select> 장
-            </div>
-            <div style="display:flex; align-items:center;">
-                <span style="width: 40px; font-weight:bold;">종료:</span>
-                <select id="mock-end-ch"></select> 장
-            </div>
-            <p style="font-size:12px; color:#666; margin-top:10px;">선택한 장 범위 안에서 <b>무작위로 30절</b>이 출제됩니다.</p>
         </div>
         
         <button class="btn" onclick="startExam()">시험 시작</button> 
-        <button class="btn btn-outline" onclick="showScreen('screen-history')" style="margin-top:20px;">내 기록 및 오답 보기</button>
+        <button class="btn btn-outline" onclick="showScreen('screen-history')" style="margin-top:20px;">내 기록 및 취약점 보기</button>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc; font-size:13px;">
             <p style="color:#ef4444; font-weight:bold; margin-top:0;">※ 주의: 인터넷 방문 기록을 지우면 기록이 날아갑니다. 안전을 위해 백업하세요.</p>
             <div style="display:flex; gap:10px;">
-                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="exportData()">💾 기록 파일로 저장</button>
-                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="document.getElementById('import-file').click()">📂 저장된 파일 불러오기</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="exportData()">💾 기록 백업하기</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="document.getElementById('import-file').click()">📂 데이터 불러오기</button>
                 <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importData(event)">
             </div>
         </div>
     </div>
 
+    <!-- 2. 시험 화면 -->
     <div id="screen-exam" class="hidden">
         <h2 id="exam-title">시험 응시</h2>
         <div id="exam-info" style="text-align:right;font-size:13px;color:#666;margin-bottom:10px;font-weight:700"></div>
@@ -107,12 +127,17 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:10px;">시험 취소 (뒤로가기)</button>
     </div>
 
+    <!-- 3. 결과 화면 -->
     <div id="screen-result" class="hidden">
         <h2>채점 결과</h2>
         <div class="score-board">
             <div id="res-mode-info" style="color:#666;font-size:14px;margin-bottom:5px"></div>
             <div class="score-num" id="res-score">0점</div>
         </div>
+        
+        <!-- AI 피드백 박스 -->
+        <div id="result-feedback" class="feedback-box"></div>
+
         <div id="result-details"></div>
         <div style="display:flex;gap:10px;margin-top:30px">
             <button class="btn btn-outline" onclick="location.reload()" style="margin-top:0">홈으로</button>
@@ -120,12 +145,14 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         </div>
     </div>
 
+    <!-- 4. 기록(히스토리) 화면 -->
     <div id="screen-history" class="hidden">
         <h2>내 응시 기록</h2>
         <div id="history-list"></div>
         <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:20px;">홈으로 돌아가기</button>
     </div>
 
+    <!-- 5. 오답 노트 (기록 상세) 화면 -->
     <div id="screen-history-detail" class="hidden">
         <h2>상세 채점 내역</h2>
         <div id="history-detail-content"></div>
@@ -136,13 +163,13 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 
 <script>
 // =========================================================================
-// 데이터 초기화 및 UI 컨트롤
+// 전역 변수 및 초기화
 // =========================================================================
+const TARGET_DATE = new Date('2026-06-26T00:00:00');
+const STORAGE_KEY = 'bibleExamHistoryV2'; // 버전 업그레이드
 let currentQuestions = [];
 let currentMode = 'normal'; // 'normal' | 'mock'
-let startTime = null;
 
-// DOM 유틸리티
 const $ = (id) => document.getElementById(id);
 
 // 화면 전환
@@ -151,24 +178,18 @@ function showScreen(screenId) {
     $(screenId).classList.remove("hidden");
     window.scrollTo(0, 0);
     
-    if (screenId === 'screen-history') {
-        renderHistoryList();
-    }
+    if (screenId === 'screen-history') renderHistoryList();
+    if (screenId === 'screen-home') updateDashboard();
 }
 
-// 탭(모드) 전환
 window.switchMode = (mode) => {
     currentMode = mode;
     if (mode === 'normal') {
         $('tab-normal').classList.add('active');
         $('tab-mock').classList.remove('active');
-        $('setup-normal').classList.remove('hidden');
-        $('setup-mock').classList.add('hidden');
     } else {
         $('tab-mock').classList.add('active');
         $('tab-normal').classList.remove('active');
-        $('setup-mock').classList.remove('hidden');
-        $('setup-normal').classList.add('hidden');
     }
 };
 
@@ -178,102 +199,133 @@ window.onload = () => {
         return;
     }
     
-    // 장(Chapter) 목록 가져오기
-    let chapters = Object.keys(window.BIBLE).map(Number).sort((a,b)=>a-b);
-    
-    // 셀렉트 박스 세팅
-    let chOptions = chapters.map(c => `<option value="${c}">${c}</option>`).join('');
-    $('start-ch').innerHTML = chOptions;
-    $('end-ch').innerHTML = chOptions;
-    $('mock-start-ch').innerHTML = chOptions;
-    $('mock-end-ch').innerHTML = chOptions;
-
-    // 초기 절 세팅
-    updateVerseSelect('start-ch', 'start-v');
-    updateVerseSelect('end-ch', 'end-v');
-    
-    // 종료장은 기본적으로 마지막 장으로 세팅
-    $('end-ch').value = chapters[chapters.length - 1];
-    updateVerseSelect('end-ch', 'end-v');
-    $('mock-end-ch').value = chapters[chapters.length - 1];
-    
-    // 종료절은 마지막 절로 세팅
-    let lastChOptions = $('end-v').options;
-    $('end-v').value = lastChOptions[lastChOptions.length - 1].value;
+    renderChapterCheckboxes();
+    updateDashboard();
 };
 
-// 장 선택 시 해당 장의 절 목록 업데이트
-window.updateVerseSelect = (chId, vId) => {
-    let ch = $(chId).value;
-    if (!window.BIBLE[ch]) return;
-    
-    let verses = Object.keys(window.BIBLE[ch]).map(Number).sort((a,b)=>a-b);
-    $(vId).innerHTML = verses.map(v => `<option value="${v}">${v}</option>`).join('');
-};
-
-// =========================================================================
-// 시험 로직
-// =========================================================================
-
-// 특정 범위의 성구 모두 가져오기
-function getVersesInRange(startCh, startV, endCh, endV) {
-    let verses = [];
+// 챕터 체크박스 생성 (7~12장 기본 체크)
+function renderChapterCheckboxes() {
     let chapters = Object.keys(window.BIBLE).map(Number).sort((a,b)=>a-b);
-    
-    for (let c of chapters) {
-        if (c < startCh || c > endCh) continue;
-        
-        let vKeys = Object.keys(window.BIBLE[c]).map(Number).sort((a,b)=>a-b);
-        for (let v of vKeys) {
-            if (c === startCh && v < startV) continue;
-            if (c === endCh && v > endV) continue;
-            verses.push({ c: c, v: v, t: window.BIBLE[c][v], title: `${c}장 ${v}절` });
+    let html = '';
+    chapters.forEach(c => {
+        let isTarget = (c >= 7 && c <= 12);
+        let checked = isTarget ? 'checked' : '';
+        html += `<label class="ch-label"><input type="checkbox" class="ch-cb" value="${c}" ${checked}> ${c}장</label>`;
+    });
+    $('chapter-grid').innerHTML = html;
+}
+
+// =========================================================================
+// 대시보드 로직 (할당량 및 진도율 계산)
+// =========================================================================
+
+function getDDay() {
+    let today = new Date();
+    today.setHours(0,0,0,0);
+    let timeDiff = TARGET_DATE.getTime() - today.getTime();
+    let days = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    return days < 0 ? 0 : days;
+}
+
+// 7~12장에 해당하는 총 절의 개수 파악
+function getTargetTotalVerses() {
+    let count = 0;
+    for (let c = 7; c <= 12; c++) {
+        if (window.BIBLE[c]) {
+            count += Object.keys(window.BIBLE[c]).length;
         }
     }
-    return verses;
+    return count;
+}
+
+// 과거 시험 기록에서 7~12장 중 '100점'을 맞은 고유 절의 개수 파악
+function getMasteredTargetVerses() {
+    let history = getHistory();
+    let mastered = new Set();
+    
+    history.forEach(record => {
+        record.details.forEach(det => {
+            // "7장 12절" 포맷 파싱
+            let match = det.title.match(/(\d+)장\s+(\d+)절/);
+            if (match && det.score === 100) {
+                let ch = parseInt(match[1]);
+                if (ch >= 7 && ch <= 12) {
+                    mastered.add(det.title);
+                }
+            }
+        });
+    });
+    return mastered.size;
+}
+
+function updateDashboard() {
+    let dDay = getDDay();
+    let totalTarget = getTargetTotalVerses();
+    let masteredCount = getMasteredTargetVerses();
+    let remainingVerses = totalTarget - masteredCount;
+    
+    // 할당량 로직: 남은 절 수 / 남은 일수 (결석 시 할당량 자연 증가)
+    let dailyQuota = 0;
+    if (dDay > 0) {
+        dailyQuota = Math.ceil(remainingVerses / dDay);
+    } else {
+        dailyQuota = remainingVerses; // D-Day 당일이거나 지났으면 남은거 전부
+    }
+    
+    $('dash-dday-badge').innerText = dDay > 0 ? `D-${dDay}` : (dDay === 0 ? `D-Day` : `기한 종료`);
+    $('dash-quota').innerText = `${dailyQuota}절`;
+    $('dash-mastered').innerText = `${masteredCount} / ${totalTarget}절`;
+    
+    // 마스터 완료 시 축하 색상 변경
+    if(masteredCount >= totalTarget && totalTarget > 0) {
+        $('dash-quota').innerText = `🎉 달성 완료`;
+        $('dash-quota').style.color = "#fbbf24";
+    }
+}
+
+// =========================================================================
+// 시험 시작 로직
+// =========================================================================
+
+function getSelectedVerses() {
+    let verses = [];
+    let checkedChapters = Array.from(document.querySelectorAll('.ch-cb:checked')).map(cb => parseInt(cb.value));
+    
+    checkedChapters.forEach(c => {
+        if(window.BIBLE[c]) {
+            let vKeys = Object.keys(window.BIBLE[c]).map(Number).sort((a,b)=>a-b);
+            vKeys.forEach(v => {
+                verses.push({ c: c, v: v, t: window.BIBLE[c][v], title: `${c}장 ${v}절` });
+            });
+        }
+    });
+    return { verses, checkedChapters };
 }
 
 window.startExam = () => {
     currentQuestions = [];
+    let { verses, checkedChapters } = getSelectedVerses();
     
-    if (currentMode === 'normal') {
-        let sc = parseInt($('start-ch').value);
-        let sv = parseInt($('start-v').value);
-        let ec = parseInt($('end-ch').value);
-        let ev = parseInt($('end-v').value);
-        
-        if (sc > ec || (sc === ec && sv > ev)) {
-            return alert("시작 범위가 종료 범위보다 클 수 없습니다.");
-        }
-        
-        currentQuestions = getVersesInRange(sc, sv, ec, ev);
-        // 랜덤 섞기
-        currentQuestions.sort(() => Math.random() - 0.5);
-        $('exam-info').innerText = `응시 모드: ${sc}장 ${sv}절 ~ ${ec}장 ${ev}절 (총 ${currentQuestions.length}절 랜덤)`;
-
-    } else { // 모의고사 모드
-        let sc = parseInt($('mock-start-ch').value);
-        let ec = parseInt($('mock-end-ch').value);
-        
-        if (sc > ec) return alert("시작 장이 종료 장보다 클 수 없습니다.");
-        
-        // 해당 장의 모든 절 가져오기 (절 번호 무관하게 끝까지)
-        let allVerses = getVersesInRange(sc, 1, ec, 999);
-        
-        if (allVerses.length === 0) return alert("해당 범위에 말씀이 없습니다.");
-        
-        // 섞은 뒤 30개만 추출
-        allVerses.sort(() => Math.random() - 0.5);
-        currentQuestions = allVerses.slice(0, 30);
-        $('exam-info').innerText = `모의고사: ${sc}장 ~ ${ec}장 (랜덤 30절 출제)`;
+    if (checkedChapters.length === 0) {
+        return alert("최소 1개 이상의 장을 선택해주세요.");
+    }
+    if (verses.length === 0) {
+        return alert("선택한 장에 데이터가 없습니다.");
     }
 
-    if (currentQuestions.length === 0) {
-        return alert("출제할 성구가 없습니다. 범위를 확인해주세요.");
+    // 섞기
+    verses.sort(() => Math.random() - 0.5);
+
+    if (currentMode === 'normal') {
+        currentQuestions = verses;
+        $('exam-info').innerText = `응시 모드: ${checkedChapters.join(', ')}장 (총 ${currentQuestions.length}절 전체 출제)`;
+    } else {
+        // 모의고사: 30개만
+        currentQuestions = verses.slice(0, 30);
+        $('exam-info').innerText = `모의고사: ${checkedChapters.join(', ')}장 (랜덤 30절 출제)`;
     }
 
     renderQuestions();
-    startTime = new Date();
     showScreen('screen-exam');
 };
 
@@ -288,7 +340,6 @@ function renderQuestions() {
     $("question-container").innerHTML = qHtml;
 }
 
-// 점수 계산 (특수문자, 띄어쓰기 무시)
 function calculateScore(userAns, correctAns) {
     if(!userAns) return 0;
     let u = userAns.replace(/[\s\.\,\?\!\'\"0-9\(\)\[\]\|\~\-\>\:\<\&]/g, '');
@@ -297,7 +348,7 @@ function calculateScore(userAns, correctAns) {
 }
 
 // =========================================================================
-// 채점 및 결과 (Diff 알고리즘)
+// 채점 및 결과 (피드백 시스템 포함)
 // =========================================================================
 
 function renderDiff(userAns, correctAns) {
@@ -307,7 +358,6 @@ function renderDiff(userAns, correctAns) {
 
     let diffs = Diff.diffChars(correctAns, userAns);
     let html = '';
-    let summaryNotes = [];
     let errUser = '';
     let errCorrect = '';
 
@@ -347,35 +397,54 @@ window.submitExam = () => {
     
     let totalScore = 0;
     let recordDetails = [];
+    let weakVerses = [];
 
     currentQuestions.forEach((q, idx) => {
         let userAns = $(`ans-${idx}`).value.trim();
         let score = calculateScore(userAns, q.t);
         totalScore += score;
         
-        recordDetails.push({
-            title: q.title,
-            correct: q.t,
-            user: userAns,
-            score: score
-        });
+        recordDetails.push({ title: q.title, correct: q.t, user: userAns, score: score });
+        
+        if (score < 100) {
+            weakVerses.push(q.title);
+        }
     });
 
     let avgScore = Math.round(totalScore / currentQuestions.length);
     let modeText = $('exam-info').innerText;
 
-    // 현재 결과 화면 렌더링
+    // 브라우저 로컬 스토리지에 저장
+    saveRecordToLocal(modeText, avgScore, recordDetails);
+    
+    // 저장 후 마스터 현황을 다시 불러오기 위해 대시보드 상태 갱신 (보이진 않지만 데이터 계산용)
+    updateDashboard();
+
+    // 결과 화면 렌더링
     $('res-score').innerText = `${avgScore}점`;
     $('res-mode-info').innerText = modeText;
     $('result-details').innerHTML = buildResultHTML(recordDetails);
 
-    // 브라우저 로컬 스토리지에 저장
-    saveRecordToLocal(modeText, avgScore, recordDetails);
+    // AI 학습 피드백 생성
+    let feedbackHtml = `<div class="feedback-title">💡 학습 현황 및 추천 가이드</div>`;
+    if (weakVerses.length > 0) {
+        feedbackHtml += `<ul class="feedback-list">
+            <li>이번 시험에서 <b>총 ${weakVerses.length}개의 오답</b>이 발생했습니다.</li>
+            <li><strong style="color:var(--error)">취약점 보완:</strong> 다음 성구를 집중적으로 복습해 주세요.<br><span style="color:#4b5563; font-size:13px;">${weakVerses.join(', ')}</span></li>
+            <li style="margin-top:10px;">홈 화면으로 돌아가시면 내일/오늘의 남은 할당량이 자동 갱신됩니다! 꾸준히 화이팅하세요.</li>
+        </ul>`;
+    } else {
+        feedbackHtml += `<ul class="feedback-list">
+            <li>놀랍습니다! 이번 범위의 <b>모든 말씀을 완벽하게 마스터</b>했습니다. 💯</li>
+            <li>다음 장을 추가로 선택하여 모의고사를 진행해 보시는 것을 추천합니다!</li>
+        </ul>`;
+    }
+    $('result-feedback').innerHTML = feedbackHtml;
 
     showScreen("screen-result");
 };
 
-// 결과 HTML 생성 함수 (시험 직후 & 기록 조회 시 공용 사용)
+// 결과 HTML 생성 함수
 function buildResultHTML(details) {
     let html = '';
     details.forEach(det => {
@@ -402,10 +471,14 @@ function buildResultHTML(details) {
 // =========================================================================
 // 로컬 스토리지 데이터 관리 및 백업
 // =========================================================================
-const STORAGE_KEY = 'bibleExamHistoryV1';
-
 function getHistory() {
     let data = localStorage.getItem(STORAGE_KEY);
+    // V1 데이터 마이그레이션 방어코드
+    let oldData = localStorage.getItem('bibleExamHistoryV1');
+    if (!data && oldData) {
+        localStorage.setItem(STORAGE_KEY, oldData);
+        data = oldData;
+    }
     return data ? JSON.parse(data) : [];
 }
 
@@ -418,7 +491,6 @@ function saveRecordToLocal(modeText, score, details) {
         score: score,
         details: details
     };
-    // 최신순 정렬을 위해 앞에 추가
     history.unshift(newRecord);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
 }
@@ -462,14 +534,13 @@ window.viewHistoryDetail = (id) => {
 };
 
 window.deleteRecord = (id) => {
-    if(!confirm("이 기록을 삭제하시겠습니까?")) return;
+    if(!confirm("이 기록을 삭제하시겠습니까? (삭제 시 마스터 현황 및 할당량에 영향을 줄 수 있습니다)")) return;
     let history = getHistory();
     history = history.filter(h => h.id !== id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     renderHistoryList();
 };
 
-// 파일로 백업 (저장)
 window.exportData = () => {
     let data = localStorage.getItem(STORAGE_KEY);
     if (!data || data === "[]") return alert("저장할 기록이 없습니다.");
@@ -481,7 +552,6 @@ window.exportData = () => {
     link.click();
 };
 
-// 파일에서 불러오기
 window.importData = (event) => {
     let file = event.target.files[0];
     if (!file) return;
@@ -504,7 +574,7 @@ window.importData = (event) => {
         }
     };
     reader.readAsText(file);
-    event.target.value = ''; // 초기화
+    event.target.value = ''; 
 };
 </script>
 </body>
