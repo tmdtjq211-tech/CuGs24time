@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>말씀 실력 점검 시스템</title>
+
+<script src="data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+<style>
+:root{--primary:#1e3a8a;--secondary:#fbbf24;--bg-color:#f3f4f6;--card-bg:#ffffff;--text-main:#333333;--success:#10b981;--error:#ef4444;--correct-blue:#2563eb}
+body{font-family:'Malgun Gothic',sans-serif;background-color:var(--bg-color);margin:0;padding:20px 10px;display:flex;justify-content:center;min-height:100vh}
+.container{background:var(--card-bg);width:100%;max-width:800px;padding:30px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.05);border-top:8px solid var(--primary);position:relative}
+h2,h3{color:var(--primary);text-align:center}
+h3{margin-top:0}
+.btn{width:100%;padding:14px;background-color:var(--primary);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;transition:.2s;margin-top:10px}
+.btn:hover{background-color:#1e40af}
+.btn.btn-outline{background:0 0;color:var(--primary);border:2px solid var(--primary)}
+.btn.btn-secondary{background:#6b7280; color:white;}
+.btn.btn-secondary:hover{background:#4b5563;}
+.btn.btn-danger{background:var(--error)}
+.btn-sm{width:auto;padding:6px 12px;font-size:12px;margin-top:0}
+.input-group{margin-bottom:15px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;}
+.input-group label{display:block; margin-bottom:8px; font-weight:700; color:var(--primary)}
+select {padding:8px; border:1px solid #d1d5db; border-radius:6px; margin-right:5px; font-size:14px;}
+.question-box{background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:10px;margin-bottom:20px}
+.q-title{font-weight:700;color:var(--primary);margin-bottom:15px;border-bottom:2px solid var(--secondary);padding-bottom:5px}
+textarea{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;min-height:80px;resize:vertical;box-sizing:border-box;font-size:15px;line-height:1.6;margin-bottom:5px}
+textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(30,58,138,.1)}
+.score-board{background:#fffbeb;padding:20px;border-radius:10px;text-align:center;border:2px solid var(--secondary);margin-bottom:20px}
+.score-num{font-size:36px;font-weight:700;color:var(--primary)}
+.acc-badge{padding:3px 8px;border-radius:4px;color:#fff;font-size:12px;font-weight:700;margin-left:10px;display:inline-block}
+.acc-high{background:var(--success)}
+.acc-low{background:var(--error)}
+.hidden{display:none!important}
+.result-content-box{padding:12px;border-radius:8px;margin-top:5px;line-height:1.6;font-size:15px;word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;}
+.verse-label {font-size: 14px; font-weight: 700; color: var(--primary); display: inline-block; margin-top: 5px; margin-bottom: 2px;}
+
+/* 탭 스타일 */
+.tab-container {display: flex; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;}
+.tab {flex: 1; text-align: center; padding: 12px; cursor: pointer; font-weight: bold; color: #64748b;}
+.tab.active {color: var(--primary); border-bottom: 3px solid var(--primary); margin-bottom: -2px;}
+
+/* 히스토리 리스트 */
+.history-item {background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+.history-info {flex: 1;}
+.history-score {font-size: 18px; font-weight: bold; color: var(--primary); width: 80px; text-align: right;}
+</style>
+</head>
+<body>
+<div class="container">
+    
+    <div id="screen-home">
+        <h2 style="background:var(--secondary);padding:10px;border-radius:8px">말씀 실력 점검</h2>
+        
+        <div class="tab-container">
+            <div class="tab active" id="tab-normal" onclick="switchMode('normal')">응시하기 (범위 지정)</div>
+            <div class="tab" id="tab-mock" onclick="switchMode('mock')">모의고사 (30문제 랜덤)</div>
+        </div>
+
+        <div id="setup-normal" class="input-group">
+            <label>출제 범위 선택 (장/절)</label>
+            <div style="margin-bottom: 10px; display:flex; align-items:center;">
+                <span style="width: 40px; font-weight:bold;">시작:</span>
+                <select id="start-ch" onchange="updateVerseSelect('start-ch', 'start-v')"></select> 장
+                <select id="start-v" style="margin-left: 10px;"></select> 절
+            </div>
+            <div style="display:flex; align-items:center;">
+                <span style="width: 40px; font-weight:bold;">종료:</span>
+                <select id="end-ch" onchange="updateVerseSelect('end-ch', 'end-v')"></select> 장
+                <select id="end-v" style="margin-left: 10px;"></select> 절
+            </div>
+            <p style="font-size:12px; color:#666; margin-top:10px;">선택한 범위 안에서 랜덤으로 모든 절이 출제됩니다.</p>
+        </div>
+
+        <div id="setup-mock" class="input-group hidden">
+            <label>모의고사 출제 범위 (장 단위)</label>
+            <div style="margin-bottom: 10px; display:flex; align-items:center;">
+                <span style="width: 40px; font-weight:bold;">시작:</span>
+                <select id="mock-start-ch"></select> 장
+            </div>
+            <div style="display:flex; align-items:center;">
+                <span style="width: 40px; font-weight:bold;">종료:</span>
+                <select id="mock-end-ch"></select> 장
+            </div>
+            <p style="font-size:12px; color:#666; margin-top:10px;">선택한 장 범위 안에서 <b>무작위로 30절</b>이 출제됩니다.</p>
+        </div>
+        
+        <button class="btn" onclick="startExam()">시험 시작</button> 
+        <button class="btn btn-outline" onclick="showScreen('screen-history')" style="margin-top:20px;">내 기록 및 오답 보기</button>
+        
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc; font-size:13px;">
+            <p style="color:#ef4444; font-weight:bold; margin-top:0;">※ 주의: 인터넷 방문 기록을 지우면 기록이 날아갑니다. 안전을 위해 백업하세요.</p>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="exportData()">💾 기록 파일로 저장</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="document.getElementById('import-file').click()">📂 저장된 파일 불러오기</button>
+                <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importData(event)">
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-exam" class="hidden">
+        <h2 id="exam-title">시험 응시</h2>
+        <div id="exam-info" style="text-align:right;font-size:13px;color:#666;margin-bottom:10px;font-weight:700"></div>
+        <div id="question-container"></div>
+        <button class="btn" onclick="submitExam()" style="background:var(--success);font-size:18px;margin-top:30px">답안 제출 및 채점하기</button>
+        <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:10px;">시험 취소 (뒤로가기)</button>
+    </div>
+
+    <div id="screen-result" class="hidden">
+        <h2>채점 결과</h2>
+        <div class="score-board">
+            <div id="res-mode-info" style="color:#666;font-size:14px;margin-bottom:5px"></div>
+            <div class="score-num" id="res-score">0점</div>
+        </div>
+        <div id="result-details"></div>
+        <div style="display:flex;gap:10px;margin-top:30px">
+            <button class="btn btn-outline" onclick="location.reload()" style="margin-top:0">홈으로</button>
+            <button class="btn" onclick="showScreen('screen-history')" style="margin-top:0">내 기록 보기</button> 
+        </div>
+    </div>
+
+    <div id="screen-history" class="hidden">
+        <h2>내 응시 기록</h2>
+        <div id="history-list"></div>
+        <button class="btn btn-secondary" onclick="location.reload()" style="margin-top:20px;">홈으로 돌아가기</button>
+    </div>
+
+    <div id="screen-history-detail" class="hidden">
+        <h2>상세 채점 내역</h2>
+        <div id="history-detail-content"></div>
+        <button class="btn btn-secondary" onclick="showScreen('screen-history')" style="margin-top:20px;">목록으로 돌아가기</button>
+    </div>
+
+</div>
+
+<script>
+// =========================================================================
+// 데이터 초기화 및 UI 컨트롤
+// =========================================================================
+let currentQuestions = [];
+let currentMode = 'normal'; // 'normal' | 'mock'
+let startTime = null;
+
+// DOM 유틸리티
+const $ = (id) => document.getElementById(id);
+
+// 화면 전환
+function showScreen(screenId) {
+    ["screen-home", "screen-exam", "screen-result", "screen-history", "screen-history-detail"].forEach(id => $(id).classList.add("hidden"));
+    $(screenId).classList.remove("hidden");
+    window.scrollTo(0, 0);
+    
+    if (screenId === 'screen-history') {
+        renderHistoryList();
+    }
+}
+
+// 탭(모드) 전환
+window.switchMode = (mode) => {
+    currentMode = mode;
+    if (mode === 'normal') {
+        $('tab-normal').classList.add('active');
+        $('tab-mock').classList.remove('active');
+        $('setup-normal').classList.remove('hidden');
+        $('setup-mock').classList.add('hidden');
+    } else {
+        $('tab-mock').classList.add('active');
+        $('tab-normal').classList.remove('active');
+        $('setup-mock').classList.remove('hidden');
+        $('setup-normal').classList.add('hidden');
+    }
+};
+
+window.onload = () => {
+    if (typeof window.BIBLE === 'undefined') {
+        alert("성경 데이터(data.js)를 불러오지 못했습니다. 동일한 폴더에 파일이 있는지 확인해주세요.");
+        return;
+    }
+    
+    // 장(Chapter) 목록 가져오기
+    let chapters = Object.keys(window.BIBLE).map(Number).sort((a,b)=>a-b);
+    
+    // 셀렉트 박스 세팅
+    let chOptions = chapters.map(c => `<option value="${c}">${c}</option>`).join('');
+    $('start-ch').innerHTML = chOptions;
+    $('end-ch').innerHTML = chOptions;
+    $('mock-start-ch').innerHTML = chOptions;
+    $('mock-end-ch').innerHTML = chOptions;
+
+    // 초기 절 세팅
+    updateVerseSelect('start-ch', 'start-v');
+    updateVerseSelect('end-ch', 'end-v');
+    
+    // 종료장은 기본적으로 마지막 장으로 세팅
+    $('end-ch').value = chapters[chapters.length - 1];
+    updateVerseSelect('end-ch', 'end-v');
+    $('mock-end-ch').value = chapters[chapters.length - 1];
+    
+    // 종료절은 마지막 절로 세팅
+    let lastChOptions = $('end-v').options;
+    $('end-v').value = lastChOptions[lastChOptions.length - 1].value;
+};
+
+// 장 선택 시 해당 장의 절 목록 업데이트
+window.updateVerseSelect = (chId, vId) => {
+    let ch = $(chId).value;
+    if (!window.BIBLE[ch]) return;
+    
+    let verses = Object.keys(window.BIBLE[ch]).map(Number).sort((a,b)=>a-b);
+    $(vId).innerHTML = verses.map(v => `<option value="${v}">${v}</option>`).join('');
+};
+
+// =========================================================================
+// 시험 로직
+// =========================================================================
+
+// 특정 범위의 성구 모두 가져오기
+function getVersesInRange(startCh, startV, endCh, endV) {
+    let verses = [];
+    let chapters = Object.keys(window.BIBLE).map(Number).sort((a,b)=>a-b);
+    
+    for (let c of chapters) {
+        if (c < startCh || c > endCh) continue;
+        
+        let vKeys = Object.keys(window.BIBLE[c]).map(Number).sort((a,b)=>a-b);
+        for (let v of vKeys) {
+            if (c === startCh && v < startV) continue;
+            if (c === endCh && v > endV) continue;
+            verses.push({ c: c, v: v, t: window.BIBLE[c][v], title: `${c}장 ${v}절` });
+        }
+    }
+    return verses;
+}
+
+window.startExam = () => {
+    currentQuestions = [];
+    
+    if (currentMode === 'normal') {
+        let sc = parseInt($('start-ch').value);
+        let sv = parseInt($('start-v').value);
+        let ec = parseInt($('end-ch').value);
+        let ev = parseInt($('end-v').value);
+        
+        if (sc > ec || (sc === ec && sv > ev)) {
+            return alert("시작 범위가 종료 범위보다 클 수 없습니다.");
+        }
+        
+        currentQuestions = getVersesInRange(sc, sv, ec, ev);
+        // 랜덤 섞기
+        currentQuestions.sort(() => Math.random() - 0.5);
+        $('exam-info').innerText = `응시 모드: ${sc}장 ${sv}절 ~ ${ec}장 ${ev}절 (총 ${currentQuestions.length}절 랜덤)`;
+
+    } else { // 모의고사 모드
+        let sc = parseInt($('mock-start-ch').value);
+        let ec = parseInt($('mock-end-ch').value);
+        
+        if (sc > ec) return alert("시작 장이 종료 장보다 클 수 없습니다.");
+        
+        // 해당 장의 모든 절 가져오기 (절 번호 무관하게 끝까지)
+        let allVerses = getVersesInRange(sc, 1, ec, 999);
+        
+        if (allVerses.length === 0) return alert("해당 범위에 말씀이 없습니다.");
+        
+        // 섞은 뒤 30개만 추출
+        allVerses.sort(() => Math.random() - 0.5);
+        currentQuestions = allVerses.slice(0, 30);
+        $('exam-info').innerText = `모의고사: ${sc}장 ~ ${ec}장 (랜덤 30절 출제)`;
+    }
+
+    if (currentQuestions.length === 0) {
+        return alert("출제할 성구가 없습니다. 범위를 확인해주세요.");
+    }
+
+    renderQuestions();
+    startTime = new Date();
+    showScreen('screen-exam');
+};
+
+function renderQuestions() {
+    let qHtml = '';
+    currentQuestions.forEach((q, idx) => {
+        qHtml += `<div class="question-box">
+            <div class="q-title">Q${idx + 1}. ${q.title}</div>
+            <textarea class="ans verse-ans" id="ans-${idx}" placeholder="말씀을 입력하세요..."></textarea>
+        </div>`;
+    });
+    $("question-container").innerHTML = qHtml;
+}
+
+// 점수 계산 (특수문자, 띄어쓰기 무시)
+function calculateScore(userAns, correctAns) {
+    if(!userAns) return 0;
+    let u = userAns.replace(/[\s\.\,\?\!\'\"0-9\(\)\[\]\|\~\-\>\:\<\&]/g, '');
+    let c = correctAns.replace(/[\s\.\,\?\!\'\"0-9\(\)\[\]\|\~\-\>\:\<\&]/g, '');
+    return (u === c && u.length > 0) ? 100 : 0;
+}
+
+// =========================================================================
+// 채점 및 결과 (Diff 알고리즘)
+// =========================================================================
+
+function renderDiff(userAns, correctAns) {
+    if (!userAns) return '<span style="color:#999;">(미입력)</span>';
+    if (!correctAns) correctAns = "";
+    if (typeof Diff === 'undefined') return userAns;
+
+    let diffs = Diff.diffChars(correctAns, userAns);
+    let html = '';
+    let summaryNotes = [];
+    let errUser = '';
+    let errCorrect = '';
+
+    function flushErrors() {
+        if (errUser || errCorrect) {
+            let cUser = errUser.replace(/[\s\.\,\?\!\'\"0-9\(\)\[\]\|\~\-\>\:\<\&]/g, '');
+            let cCorrect = errCorrect.replace(/[\s\.\,\?\!\'\"0-9\(\)\[\]\|\~\-\>\:\<\&]/g, '');
+
+            if (cUser.length === 0 && cCorrect.length === 0) {
+                html += errCorrect;
+            } else {
+                if (cUser.length > 0) html += `<span class="diff-error" style="color:var(--error); text-decoration:underline; font-weight:700; background-color:#fee2e2; border-radius:4px;">${errUser}</span>`;
+                if (cCorrect.length > 0) {
+                    if (cUser.length > 0) {
+                        html += `<span style="color:#059669; font-size:12px; font-weight:bold; background-color:#ecfdf5; border-radius:4px; border:1px solid #a7f3d0; margin-left:2px; margin-right:4px;">(정답:${errCorrect})</span>`;
+                    } else {
+                        html += `<span style="color:#d97706; background-color:#fffbeb; font-size:12px; font-weight:bold; border-radius:4px; border:1px solid #fef3c7; margin-right:4px;">[빠짐:${errCorrect}]</span>`;
+                    }
+                }
+            }
+            errUser = ''; errCorrect = '';
+        }
+    }
+
+    diffs.forEach(part => {
+        if (part.added) errUser += part.value; 
+        else if (part.removed) errCorrect += part.value; 
+        else { flushErrors(); html += `<span class="diff-correct" style="color:var(--correct-blue); font-weight:700;">${part.value}</span>`; }
+    });
+    flushErrors();
+
+    return `<div style="line-height:2.0; font-size:15px;">${html}</div>`;
+}
+
+window.submitExam = () => {
+    if (!confirm("제출하시겠습니까?")) return;
+    
+    let totalScore = 0;
+    let recordDetails = [];
+
+    currentQuestions.forEach((q, idx) => {
+        let userAns = $(`ans-${idx}`).value.trim();
+        let score = calculateScore(userAns, q.t);
+        totalScore += score;
+        
+        recordDetails.push({
+            title: q.title,
+            correct: q.t,
+            user: userAns,
+            score: score
+        });
+    });
+
+    let avgScore = Math.round(totalScore / currentQuestions.length);
+    let modeText = $('exam-info').innerText;
+
+    // 현재 결과 화면 렌더링
+    $('res-score').innerText = `${avgScore}점`;
+    $('res-mode-info').innerText = modeText;
+    $('result-details').innerHTML = buildResultHTML(recordDetails);
+
+    // 브라우저 로컬 스토리지에 저장
+    saveRecordToLocal(modeText, avgScore, recordDetails);
+
+    showScreen("screen-result");
+};
+
+// 결과 HTML 생성 함수 (시험 직후 & 기록 조회 시 공용 사용)
+function buildResultHTML(details) {
+    let html = '';
+    details.forEach(det => {
+        let badgeClass = det.score === 100 ? 'acc-high' : 'acc-low';
+        let diffHtml = renderDiff(det.user, det.correct);
+        
+        html += `<div class="question-box" style="margin-bottom:15px; padding:15px;">
+            <div style="font-weight:bold; font-size:14px; margin-bottom:10px; color:var(--primary);">
+                ${det.title} <span class="acc-badge ${badgeClass}">${det.score === 100 ? '정답' : '오답'}</span>
+            </div>
+            <div style="font-size:13px; margin-bottom:8px;">
+                <strong style="color:#666;">[작성 답안]</strong><br>
+                <div class="result-content-box" style="background:#f9f9f9; border:1px solid #eee;">${diffHtml}</div>
+            </div>
+            <div style="font-size:13px;">
+                <strong style="color:#10b981;">[실제 정답]</strong><br>
+                <div class="result-content-box" style="background:#ecfdf5; border:1px solid #a7f3d0; color:#065f46;">${det.correct}</div>
+            </div>
+        </div>`;
+    });
+    return html;
+}
+
+// =========================================================================
+// 로컬 스토리지 데이터 관리 및 백업
+// =========================================================================
+const STORAGE_KEY = 'bibleExamHistoryV1';
+
+function getHistory() {
+    let data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveRecordToLocal(modeText, score, details) {
+    let history = getHistory();
+    let newRecord = {
+        id: Date.now(),
+        date: new Date().toLocaleString(),
+        modeText: modeText,
+        score: score,
+        details: details
+    };
+    // 최신순 정렬을 위해 앞에 추가
+    history.unshift(newRecord);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+}
+
+window.renderHistoryList = () => {
+    let history = getHistory();
+    let listHtml = '';
+    
+    if (history.length === 0) {
+        listHtml = '<div style="text-align:center; padding:30px; color:#888;">응시 기록이 없습니다.</div>';
+    } else {
+        history.forEach(item => {
+            listHtml += `<div class="history-item">
+                <div class="history-info">
+                    <div style="font-size:12px; color:#888;">${item.date}</div>
+                    <div style="font-size:14px; font-weight:bold; color:#333; margin-top:3px;">${item.modeText}</div>
+                </div>
+                <div class="history-score">${item.score}점</div>
+                <button class="btn btn-sm btn-outline" style="margin-left:10px;" onclick="viewHistoryDetail(${item.id})">상세보기</button>
+                <button class="btn btn-sm btn-danger" style="margin-left:5px;" onclick="deleteRecord(${item.id})">삭제</button>
+            </div>`;
+        });
+    }
+    $('history-list').innerHTML = listHtml;
+};
+
+window.viewHistoryDetail = (id) => {
+    let history = getHistory();
+    let record = history.find(h => h.id === id);
+    if(!record) return;
+    
+    let html = `<div style="background:var(--primary); color:white; padding:15px; border-radius:8px; margin-bottom:20px;">
+        <h3 style="color:white; margin-bottom:5px;">${record.score}점</h3>
+        <div style="font-size:13px; text-align:center;">${record.date} / ${record.modeText}</div>
+    </div>`;
+    
+    html += buildResultHTML(record.details);
+    
+    $('history-detail-content').innerHTML = html;
+    showScreen('screen-history-detail');
+};
+
+window.deleteRecord = (id) => {
+    if(!confirm("이 기록을 삭제하시겠습니까?")) return;
+    let history = getHistory();
+    history = history.filter(h => h.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    renderHistoryList();
+};
+
+// 파일로 백업 (저장)
+window.exportData = () => {
+    let data = localStorage.getItem(STORAGE_KEY);
+    if (!data || data === "[]") return alert("저장할 기록이 없습니다.");
+    
+    let blob = new Blob([data], { type: 'application/json' });
+    let link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `말씀시험_백업_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+};
+
+// 파일에서 불러오기
+window.importData = (event) => {
+    let file = event.target.files[0];
+    if (!file) return;
+    
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let importedData = JSON.parse(e.target.result);
+            if (Array.isArray(importedData)) {
+                if(confirm("기존 데이터에 덮어쓰시겠습니까? (기존 데이터는 사라집니다)")) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+                    alert("성공적으로 복구되었습니다.");
+                    location.reload();
+                }
+            } else {
+                alert("잘못된 파일 형식입니다.");
+            }
+        } catch (err) {
+            alert("파일을 읽는 중 오류가 발생했습니다.");
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // 초기화
+};
+</script>
+</body>
+</html>
