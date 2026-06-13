@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>말씀 실력 점검 시스템 (누적 암송법 전용)</title>
+<title>말씀 실력 점검 시스템 (누적 출석 + 랜덤 모의고사)</title>
 
 <script src="data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
@@ -79,7 +79,7 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
                 <span>🗓️ 6월 26일 목표 진도표 (7~12장)</span>
                 <span class="dash-dday" id="dash-dday-badge">D-?</span>
             </div>
-            <div style="font-size: 13px; opacity: 0.9;">출석 시험은 <b>무조건 처음(7장 1절)부터 오늘 새 진도까지</b> 누적되어 순서대로 출제됩니다.</div>
+            <div style="font-size: 13px; opacity: 0.9;">출석 시험은 <b>무조건 처음(7장 1절)부터 오늘 새 진도까지</b> 누적되어 <b>순서대로</b> 출제됩니다.</div>
             
             <div class="dash-stats">
                 <div class="dash-stat-box">
@@ -105,7 +105,7 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
         <!-- 직접 범위 입력 폼 -->
         <div class="input-group">
             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:5px;">
-                <span style="font-weight:700; color:var(--primary); font-size:16px;">출제 범위 직접 입력 (복습용)</span>
+                <span style="font-weight:700; color:var(--primary); font-size:16px;">출제 범위 직접 입력 (랜덤 모의고사용)</span>
                 <label style="font-size:12px; font-weight:normal; color:#666; display:flex; align-items:center; cursor:pointer;">
                     <input type="checkbox" id="restrict-ch-cb" checked style="margin-right:5px;" onchange="toggleRestriction()"> 
                     7~12장만 허용 (해제 시 전체 선택 가능)
@@ -124,11 +124,11 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
                 </div>
             </div>
             <p style="font-size:12px; color:#666; text-align:center; margin-top:15px; margin-bottom:0;" id="range-help-text">
-                이 모드 또한 무작위 섞기 없이 <b>무조건 말씀 순서대로</b> 출제됩니다.
+                입력한 범위 내에서 <b>최대 25문제가 랜덤으로</b> 출제됩니다.<br>(기본적으로 7장~12장 제한됨)
             </p>
         </div>
         
-        <button class="btn" onclick="startCustomExam()">지정 범위 시험 시작</button> 
+        <button class="btn" onclick="startCustomExam()">지정 범위 랜덤 시험 시작 (최대 25문제)</button> 
         <button class="btn btn-outline" onclick="showScreen('screen-history')" style="margin-top:20px;">내 기록 및 취약점 분석 보기</button>
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px dashed #ccc; font-size:13px;">
@@ -188,7 +188,7 @@ textarea:focus{border-color:var(--primary);outline:0;box-shadow:0 0 0 3px rgba(3
 // 전역 변수 및 초기화
 // =========================================================================
 const TARGET_DATE = new Date('2026-06-26T00:00:00');
-const STORAGE_KEY = 'bibleExamHistoryV5'; 
+const STORAGE_KEY = 'bibleExamHistoryV6'; 
 let currentQuestions = [];
 let currentModeText = ''; 
 let todayQuotaCount = 0; 
@@ -221,12 +221,12 @@ window.onload = () => {
 window.toggleRestriction = () => {
     let isRestricted = $('restrict-ch-cb').checked;
     if (isRestricted) {
-        $('range-help-text').innerHTML = "이 모드 또한 무작위 섞기 없이 <b>무조건 말씀 순서대로</b> 출제됩니다. <br>(기본적으로 7장~12장 제한됨)";
+        $('range-help-text').innerHTML = "입력한 범위 내에서 <b>최대 25문제가 랜덤으로</b> 출제됩니다.<br>(기본적으로 7장~12장 제한됨)";
         $('range-help-text').style.color = "#666";
         if ($('start-ch').value < 7) $('start-ch').value = 7;
         if ($('end-ch').value > 12) $('end-ch').value = 12;
     } else {
-        $('range-help-text').innerHTML = "✅ 제한 해제됨: 모든 장(Chapter)을 자유롭게 입력할 수 있으며 <b>순서대로</b> 출제됩니다.";
+        $('range-help-text').innerHTML = "✅ 제한 해제됨: 모든 장(Chapter) 내에서 <b>최대 25문제가 랜덤으로</b> 출제됩니다.";
         $('range-help-text').style.color = "var(--success)";
     }
 };
@@ -310,9 +310,10 @@ function updateDashboard() {
 }
 
 // =========================================================================
-// 시험 시작 로직 (누적 암송법 전용: 1절부터 마지막 진도까지)
+// 시험 시작 로직
 // =========================================================================
 
+// 1. 출석체크 시험 (순서대로 누적)
 window.startDailyExam = () => {
     let allTarget = getVersesInRange(7, 1, 12, 999);
     let masteredSet = getMasteredTargetTitles();
@@ -332,7 +333,7 @@ window.startDailyExam = () => {
         let lastVerseOfToday = newVerses[newVerses.length - 1];
         let lastIndex = allTarget.findIndex(v => v.title === lastVerseOfToday.title);
         
-        // 7장 1절(인덱스 0)부터 마지막 진도까지 전부 잘라옴 (누적)
+        // 7장 1절(인덱스 0)부터 마지막 진도까지 전부 잘라옴 (순서대로 누적)
         currentQuestions = allTarget.slice(0, lastIndex + 1);
         
         currentModeText = `[누적 출석 시험] 처음(7장 1절)부터 ${lastVerseOfToday.title}까지 (총 ${currentQuestions.length}절 순서대로)`;
@@ -343,6 +344,7 @@ window.startDailyExam = () => {
     showScreen('screen-exam');
 };
 
+// 2. 직접 범위 랜덤 시험 (최대 25문제 랜덤)
 window.startCustomExam = () => {
     let sCh = parseInt($('start-ch').value);
     let sV = parseInt($('start-v').value);
@@ -364,14 +366,19 @@ window.startCustomExam = () => {
         return alert("시작 범위가 종료 범위보다 클 수 없습니다.");
     }
 
-    // 지정한 범위를 말씀 순서대로 가져옴 (랜덤 섞기 없음)
+    // 지정한 범위를 가져옴
     currentQuestions = getVersesInRange(sCh, sV, eCh, eV);
     
     if (currentQuestions.length === 0) {
         return alert("입력하신 범위에 해당하는 말씀 데이터가 없습니다.");
     }
+
+    // ★ 섞어서 최대 25문제만 추출 (랜덤 모의고사)
+    currentQuestions.sort(() => Math.random() - 0.5);
+    let examCount = Math.min(25, currentQuestions.length);
+    currentQuestions = currentQuestions.slice(0, examCount);
     
-    currentModeText = `[직접 입력 순차 시험] ${sCh}장 ${sV}절 ~ ${eCh}장 ${eV}절 (총 ${currentQuestions.length}절)`;
+    currentModeText = `[범위 랜덤 시험] ${sCh}장 ${sV}절 ~ ${eCh}장 ${eV}절 (총 ${examCount}절 랜덤 출제)`;
     $('exam-info').innerText = currentModeText;
     
     renderQuestions();
@@ -471,22 +478,21 @@ window.submitExam = () => {
     $('res-mode-info').innerText = currentModeText;
     $('result-details').innerHTML = buildResultHTML(recordDetails);
 
-    let feedbackHtml = `<div class="feedback-title">📊 누적 암송 결과 분석 가이드</div>`;
+    let feedbackHtml = `<div class="feedback-title">📊 결과 분석 가이드</div>`;
     
     if (weakVerses.length > 0) {
         let worstCh = Object.keys(weakChaptersCount).reduce((a, b) => weakChaptersCount[a] > weakChaptersCount[b] ? a : b);
         
         feedbackHtml += `<ul class="feedback-list">
-            <li>총 ${currentQuestions.length}절을 누적해서 암송하시느라 수고하셨습니다. 이번엔 <b>${weakVerses.length}개</b>의 오답이 있었습니다.</li>
-            <li><strong style="color:var(--error)">취약점 분석:</strong> 처음부터 누적해서 외우다 보니 <b>${worstCh}장</b> 부근에서 흐름이 끊기거나 오답이 많이 발생했습니다.</li>
-            <li><strong style="color:var(--primary)">학습 추천:</strong> 홈 화면의 <b>'직접 입력'</b> 기능을 통해 <span style="background:#e0f2fe; padding:2px 6px; border-radius:4px;">오답이 난 성구 범위</span>만 짧게 지정해서 입에 붙을 때까지 순서대로 반복해 보세요.</li>
-            <li style="margin-top:10px; color:#4b5563;">※ 틀린 성구들은 100점을 맞을 때까지 누적 진도의 '새 할당량' 취급을 받으며 계속해서 출제됩니다.</li>
+            <li>총 ${currentQuestions.length}문제 중 <b>${weakVerses.length}개</b>의 오답이 발생했습니다.</li>
+            <li><strong style="color:var(--error)">취약점 분석:</strong> 이번 시험에서는 주로 <b>${worstCh}장</b> 부근에서 오답이 많이 발생했습니다.</li>
+            <li><strong style="color:var(--primary)">학습 추천:</strong> 홈 화면의 <b>'직접 입력 (랜덤 모의고사)'</b> 기능을 통해 <span style="background:#e0f2fe; padding:2px 6px; border-radius:4px;">${worstCh}장</span> 부분을 집중적으로 점검해 보세요.</li>
+            <li style="margin-top:10px; color:#4b5563;">※ 틀린 성구들은 100점을 맞을 때까지 마스터 현황에 오르지 않습니다.</li>
         </ul>`;
     } else {
         feedbackHtml += `<ul class="feedback-list">
-            <li>정말 대단하십니다! 1절부터 오늘 진도까지 <b>모든 말씀을 완벽하게 순서대로 암송</b>했습니다. 💯</li>
-            <li>누적 암송법은 가장 확실하게 장기 기억으로 넘어가는 방법입니다. 진도율이 상승했습니다!</li>
-            <li>내일 출석 시험을 누르시면, 오늘까지 외운 범위 뒤로 새로운 말씀이 덧붙여져서 또다시 처음부터 출제됩니다.</li>
+            <li>정말 대단하십니다! 출제된 <b>모든 말씀을 완벽하게 암송</b>했습니다. 💯</li>
+            <li>새 진도 성구들이 완벽하게 대시보드의 [마스터 현황]에 추가되어 진도율이 상승했습니다!</li>
         </ul>`;
     }
     $('result-feedback').innerHTML = feedbackHtml;
@@ -522,7 +528,7 @@ function buildResultHTML(details) {
 // =========================================================================
 function getHistory() {
     let data = localStorage.getItem(STORAGE_KEY);
-    let oldData = localStorage.getItem('bibleExamHistoryV4');
+    let oldData = localStorage.getItem('bibleExamHistoryV5');
     if (!data && oldData) {
         localStorage.setItem(STORAGE_KEY, oldData);
         data = oldData;
